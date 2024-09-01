@@ -1,0 +1,5 @@
+websockets
+aiohttp
+base58
+cryptography
+gputil

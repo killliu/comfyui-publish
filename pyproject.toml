@@ -1,0 +1,10 @@
+[project]
+name = "comfyui-publish"
+description = ""
+version = "1.0.0"
+license = "LICENSE"
+
+[tool.comfy]
+PublisherId = ""
+DisplayName = "ComfyUI Publisher"
+Icon = ""
