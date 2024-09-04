@@ -27,6 +27,8 @@ class Connector:
             cls._instance = super(Connector, cls).__new__(cls, *args, **kwargs)
         return cls._instance
     def __init__(self):
+        self.uid = 0
+        self.wid = 0
         self.free = True
         self.workflow = None
         self.client_id = str(uuid.uuid4())
@@ -46,12 +48,13 @@ class Connector:
                         reconnect_delay = RECONNECT_DELAY
                         self.comfyTasks = [
                             asyncio.create_task(self._recevie_comfyui_msgs()),
+                            asyncio.create_task(self._check_comfyui_alive()),
                         ]
                         await asyncio.gather(*self.comfyTasks)
                 elif connectType == ConnectType.Server:
                     async with websockets.connect(self.serverUri, extra_headers=self.header) as ws:
                         self.serverConn = ws
-                        self.to_server_queue.append({ 'key': 'bind', 'sid': API().userInfo['serverId'] })
+                        self.to_server_queue.append({ 'key': 'bind', 'wid': self.wid , 'sid': API().userInfo['serverId'] })
                         reconnect_delay = RECONNECT_DELAY
                         self.serverTasks = [
                             asyncio.create_task(self._recevie_server_msgs()),
@@ -86,6 +89,12 @@ class Connector:
         finally:
             await asyncio.sleep(0.5)
 
+    async def _check_comfyui_alive(self):
+        while True:
+            if self.comfyConn and self.comfyConn.open == True:
+                await self.comfyConn.ping()
+            await asyncio.sleep(1)
+
     async def _recevie_server_msgs(self):
         try:
             if self.serverConn.open:
@@ -94,10 +103,10 @@ class Connector:
                         msg_json = json.loads(message)
                         await self._handle_server_msg(msg_json)
         except json.JSONDecodeError as e:
-            print(f'>>>>>>>>>>>>>>>>>>>>>>>>> json decode error: {e}')
+            # print(f'>>>>>>>>>>>>>>>>>>>>>>>>> json decode error: {e}')
             pass
         except Exception as e:
-            print(f'>>>>>>>>>>>>>>>>>>>>>>>>> hand receive server message error: {e}')
+            # print(f'>>>>>>>>>>>>>>>>>>>>>>>>> hand receive server message error: {e}')
             pass
         finally:
             await asyncio.sleep(0.5)
@@ -108,11 +117,11 @@ class Connector:
             pass
         elif msg_type == "progress":
             progress = int(msg_json['data']['value'] / msg_json['data']['max'] * 100)
-            self.to_server_queue.append({'key': 'progress', 'msg': f'{progress}%'})
+            self.to_server_queue.append({'key': 'progress', 'msg': f'{progress}'})
             pass
         elif msg_type == "executed":
             self.free = True
-            self.to_server_queue.append({'key': 'progress', 'msg': '100%'})
+            self.to_server_queue.append({'key': 'progress', 'msg': '100'})
             pass
         elif msg_type == "execution_interrupted":
             self.to_server_queue.append({'key': 'interrupted'})
@@ -121,13 +130,15 @@ class Connector:
     async def _handle_server_msg(self, msg_json):
         if msg_json['key'] != "run":
             return
-        filePath = os.path.join(get_root_uri(), 'custom_nodes', 'comfyui-publish', 'workflows', f'{str(msg_json["wf_id"])}.json')
+        self.wid = msg_json["wid"]
+        filePath = os.path.join(get_root_uri(), 'custom_nodes', 'comfyui-publish', 'workflows', f'{str(self.wid)}.json')
         if os.path.exists(filePath) == False:
             self.to_server_queue.appendleft({ 'key':'err', 'msg': 'workflow not exist on comfy server' })
             return
         try:
             with open(filePath, encoding="utf-8") as f:
                 workflow_data = f.read()
+            self.uid = msg_json['uid']
             self.workflow = json.loads(workflow_data)
             # print(f">>>>>>>>>>>>>> loaded workflow --------: {workflow}")
             # print(f">>>>>>>>>>>>>> get server msg inputs: {msg_json['inputs']}")
@@ -162,9 +173,12 @@ class Connector:
                 if self.serverConn and self.serverConn.open == True:
                     if len(self.to_server_queue) > 0:
                         data = self.to_server_queue.popleft()
+                        data['uid'] = self.uid
+                        # print(">>>>>>>>>>>>>>>>>>>>> s-> s: ", data)
                         await self.serverConn.send(json.dumps(data))
                     elif bt > 10:
                         bt = 0
+                        # print(">>>>>>>>>>>>>>>>>>>>> s-> s >>>> heartbeat")
                         await self.serverConn.send(json.dumps({'key': 'hb', 'hb': self.free}))
                 await asyncio.sleep(span)
         except Exception as e:
@@ -249,7 +263,7 @@ class Connector:
             server_uri = server_uri.replace("http://", "ws://")
         if "https://" in server_uri:
             server_uri = server_uri.replace("https://", "wss://")
-        self.serverUri = f'{server_uri}/api/comfy_ws'
+        self.serverUri = f'{server_uri}/api/ai_ws_img'
         self.header = {"Authorization": f"Bearer {API().userInfo['token']}"}
         threading.Thread(target=self._thread, args=(ConnectType.Server,), daemon=True).start()
         if self.comfyConn:

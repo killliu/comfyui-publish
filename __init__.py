@@ -28,7 +28,7 @@ async def login(request):
     data = await request.json()
     result = await API().login(data)
     if API().userInfo != None:
-        await Connector().Connect()
+        Connector().Connect()
     if result == None:
         return web.Response(status=200, text=json.dumps({"su":""}))
     else:
@@ -142,7 +142,6 @@ class klPublisher:
                 "Describe": ("STRING", { "multiline": True, "default": "", "placeholder": "" }),
                 "Power": ("INT", { "default": 10, "min": 0, "max": 999999, "step": 1, "display": "number" }),
                 "FreeTimes": ("INT", { "default": 0, "min": 0, "max": 999999, "step": 1, "display": "number" }),
-                "SubscriberRule": ("BOOLEAN", {"default": True}),
                 "UploadCover": ("BOOLEAN", {"default": False}),
                 "image": (sorted(files), {"image_upload": True}),
             }
