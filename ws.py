@@ -1,4 +1,5 @@
 import asyncio
+import base64
 import collections
 import json
 import os
@@ -52,7 +53,9 @@ class Connector:
                         ]
                         await asyncio.gather(*self.comfyTasks)
                 elif connectType == ConnectType.Server:
+                    # print(f'>>>>>>>>>>>>>>>>>>>>>>>>> try to connect server', self.serverUri)
                     async with websockets.connect(self.serverUri, extra_headers=self.header) as ws:
+                        # print(f'>>>>>>>>>>>>>>>>>>>>>>>>> connect success')
                         self.serverConn = ws
                         self.to_server_queue.append({ 'key': 'bind', 'wid': self.wid , 'sid': API().userInfo['serverId'] })
                         reconnect_delay = RECONNECT_DELAY
@@ -115,22 +118,45 @@ class Connector:
         msg_type = msg_json['type']
         if not msg_type or msg_type == 'crystools.monitor':
             pass
-        elif msg_type == "progress":
+            return
+        print(f">>>>>>>>>>>>>>>>>> comfyui msg type: {msg_type} >>>>>>>>>>>>>>>>>>")
+        if msg_type == "progress":
             progress = int(msg_json['data']['value'] / msg_json['data']['max'] * 100)
             self.to_server_queue.append({'key': 'progress', 'msg': f'{progress}'})
             pass
-        elif msg_type == "executed":
-            self.free = True
-            self.to_server_queue.append({'key': 'progress', 'msg': '100'})
+        elif msg_type == "status":
+            if msg_json['data']['status']['exec_info']['queue_remaining'] == 0:
+                if self.free == False:
+                    self.to_server_queue.append({'key': 'progress', 'msg': '100'})
+                self.free = True
+            pass
+        elif msg_type == "executed" or msg_type == "execution_success":
+            # self.to_server_queue.append({'key': 'progress', 'msg': '100'})
             pass
         elif msg_type == "execution_interrupted":
             self.to_server_queue.append({'key': 'interrupted'})
+            pass
+        else:
+            # print(f">>>>>>>>>>>>>>>>>> comfyui msg type: {msg_type} >>>>>>>>>>>>>>>>>>")
             pass
 
     async def _handle_server_msg(self, msg_json):
         if msg_json['key'] != "run":
             return
+        input_json = json.loads(msg_json['inputs'])
         self.wid = msg_json["wid"]
+        names = msg_json.get('names', [])
+        images = msg_json.get('images', [])
+        if images and len(images) > 0 and names and len(names) > 0:
+            for i, value in enumerate(msg_json['images']):
+                try:
+                    image_data = base64.b64decode(value)
+                    with open(os.path.join(get_root_uri(), 'input', f"{names[i]}.webp"), "wb") as f:
+                        f.write(image_data)
+                    # print(">>>>>>>>>>>>>>>>>>>>>>>>>>> write file success:", f"{names[i]}.webp")
+                except Exception as e:
+                    # print(f">>>>>>>>>>>>>>>>>>>>>>>>>>> Error writing file: {e}")
+                    continue
         filePath = os.path.join(get_root_uri(), 'custom_nodes', 'comfyui-publish', 'workflows', f'{str(self.wid)}.json')
         if os.path.exists(filePath) == False:
             self.to_server_queue.appendleft({ 'key':'err', 'msg': 'workflow not exist on comfy server' })
@@ -142,14 +168,13 @@ class Connector:
             self.workflow = json.loads(workflow_data)
             # print(f">>>>>>>>>>>>>> loaded workflow --------: {workflow}")
             # print(f">>>>>>>>>>>>>> get server msg inputs: {msg_json['inputs']}")
-            input_json = json.loads(msg_json['inputs'])
             for item in input_json:
                 id = str(item['id'])
                 if id not in self.workflow:
                     self.to_server_queue.appendleft({ 'key':'err', 'msg': 'workflow was changed, but not update to server' })
                     return
                 it = item['type']
-                if it == 'klText':
+                if it == 'klText' or it == "klText1":
                     self.workflow[id]['inputs']['prompt'] = item['value']
                 elif it == 'klInt':
                     self.workflow[id]['inputs']['int_value'] = item['value']
@@ -157,7 +182,11 @@ class Connector:
                     cur_size = str(item['value']).split('|')
                     self.workflow[id]['inputs']['width'] = cur_size[0]
                     self.workflow[id]['inputs']['height'] = cur_size[1]
-                ###################################### TODO Other type ######################################
+                elif it == "klBool":
+                    self.workflow[id]['inputs']['bool_value'] = item['value']
+                elif it == "klImage":
+                    self.workflow[id]['inputs']['image'] = item['value']
+            # print(">>>>>>>>>>>>>>>>>>>>>>>>> workflow:\n", self.workflow)
             await self.GenImages(self.workflow)
             pass
         except Exception as e:
@@ -174,11 +203,11 @@ class Connector:
                     if len(self.to_server_queue) > 0:
                         data = self.to_server_queue.popleft()
                         data['uid'] = self.uid
-                        # print(">>>>>>>>>>>>>>>>>>>>> s-> s: ", data)
+                        # print(">>>>>>>>>>>>>>>>>>>>> c -> s: ", data)
                         await self.serverConn.send(json.dumps(data))
                     elif bt > 10:
                         bt = 0
-                        # print(">>>>>>>>>>>>>>>>>>>>> s-> s >>>> heartbeat")
+                        # print(">>>>>>>>>>>>>>>>>>>>> c -> s >>>> heartbeat")
                         await self.serverConn.send(json.dumps({'key': 'hb', 'hb': self.free}))
                 await asyncio.sleep(span)
         except Exception as e:
@@ -230,20 +259,20 @@ class Connector:
         image_base64s = []
         names = []
         history = self._get_history(self.prompt_id)[self.prompt_id]
-        for o in history['outputs']:
-            for node_id in history['outputs']:
-                node_output = history['outputs'][node_id]
-                if 'images' in node_output:
-                    for image in node_output['images']:
-                        sp = os.path.join(get_root_uri(), 'output', image['subfolder'], image['filename'])
-                        # print(">>>>>>>>>>>>>>>>>>>> save image path:", sp)
-                        bs, err = img_path_2_base64(sp)
-                        if err != "":
-                            self.to_server_queue.appendleft({'key': 'err', 'msg': err})
-                            pass
-                        else:
-                            image_base64s.append(bs)
-                            names.append(image['filename'].split('.')[-2])
+        # for o in history['outputs']:
+        for node_id in history['outputs']:
+            node_output = history['outputs'][node_id]
+            if 'images' in node_output:
+                for image in node_output['images']:
+                    sp = os.path.join(get_root_uri(), 'output', image['subfolder'], image['filename'])
+                    # print(">>>>>>>>>>>>>>>>>>>> save image path:", sp)
+                    bs, err = img_path_2_base64(sp)
+                    if err != "":
+                        self.to_server_queue.appendleft({'key': 'err', 'msg': err})
+                        pass
+                    else:
+                        image_base64s.append(bs)
+                        names.append(image['filename'].split('.')[-2])
         self.to_server_queue.append({'key': 'images', 'images': image_base64s, 'names': names})
 
     #endregion

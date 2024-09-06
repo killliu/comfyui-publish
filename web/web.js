@@ -196,6 +196,7 @@ app.registerExtension({
     async beforeRegisterNodeDef(nodeType, nodeData, app) {
         if (nodeData.name === "klImage" ||
             nodeData.name === "klText" ||
+            nodeData.name === "klText1" ||
             nodeData.name === "klInt" ||
             nodeData.name === "klSize" ||
             nodeData.name === "klBool") {

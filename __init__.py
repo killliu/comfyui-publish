@@ -79,6 +79,22 @@ class klText:
     CATEGORY = "killliu"
     def encode(self, describe, prompt):
         return prompt,
+    
+class klText1:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "describe": ("STRING", { "multiline": False, "default": "" }),
+                "prompt": ("STRING", {"multiline": False, "default": "" }), 
+            }
+        }
+    RETURN_TYPES = ("STRING",)
+    FUNCTION = "encode"
+    CATEGORY = "killliu"
+    DESCRIPTION = ("Text with one line")
+    def encode(self, describe, prompt):
+        return prompt,
 
 class klInt:
     @classmethod
@@ -155,6 +171,7 @@ NODE_CLASS_MAPPINGS = {
     "klPublisher": klPublisher,
     "klImage": klImage,
     "klText": klText,
+    "klText1": klText1,
     "klInt": klInt,
     "klSize": klSize,
     "klBool": klBool,
@@ -163,6 +180,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "klPublisher": "publish",
     "klImage": "image loader",
     "klText": "text",
+    "klText1": "text oneline",
     "klInt": "int",
     "klSize": "size",
     "klBool": "boolean",

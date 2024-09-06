@@ -105,11 +105,11 @@ class API:
                     'power': int(node["widgets_values"][5]),
                     'free_times': int(node["widgets_values"][6]),
                 }
-            if node_type == "klImage" or node_type == "klText" or node_type == "klInt" or node_type == "klBool":
+            if node_type == "klImage" or node_type == "klText" or node_type == "klText1" or node_type == "klInt" or node_type == "klBool":
                 wv = node.get('widgets_values')
                 value = wv[1]
                 if node_type == "klBool":
-                    value = "0" if wv[1] == True else "1"
+                    value = "0" if wv[1] == False else "1"
                 elif node_type == "klInt":
                     value = str(wv[1])
                 klInputs.append({ 'id':node.get('id'), 'type':node.get('type'), 'desc': wv[0], 'value': value })
