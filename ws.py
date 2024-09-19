@@ -30,6 +30,7 @@ class Connector:
     def __init__(self):
         self.uid = 0
         self.wid = 0
+        self.qid = 0
         self.free = True
         self.workflow = None
         self.client_id = str(uuid.uuid4())
@@ -53,17 +54,18 @@ class Connector:
                         ]
                         await asyncio.gather(*self.comfyTasks)
                 elif connectType == ConnectType.Server:
-                    # print(f'>>>>>>>>>>>>>>>>>>>>>>>>> try to connect server', self.serverUri)
-                    async with websockets.connect(self.serverUri, extra_headers=self.header) as ws:
-                        # print(f'>>>>>>>>>>>>>>>>>>>>>>>>> connect success')
-                        self.serverConn = ws
-                        self.to_server_queue.append({ 'key': 'bind', 'wid': self.wid , 'sid': API().userInfo['serverId'] })
-                        reconnect_delay = RECONNECT_DELAY
-                        self.serverTasks = [
-                            asyncio.create_task(self._recevie_server_msgs()),
-                            asyncio.create_task(self._c_t_s_msg())
-                        ]
-                        await asyncio.gather(*self.serverTasks)
+                    if self.comfyConn: 
+                        # print(f'>>>>>>>>>>>>>>>>>>>>>>>>> try to connect server', self.serverUri)
+                        async with websockets.connect(self.serverUri, max_size=5.5 * 1024 * 1024, extra_headers=self.header) as ws:
+                            # print(f'>>>>>>>>>>>>>>>>>>>>>>>>> connect success')
+                            self.serverConn = ws
+                            self.to_server_queue.append({ 'key': 'bind', 'wid': self.wid , 'sid': API().userInfo['serverId'] })
+                            reconnect_delay = RECONNECT_DELAY
+                            self.serverTasks = [
+                                asyncio.create_task(self._recevie_server_msgs()),
+                                asyncio.create_task(self._c_t_s_msg())
+                            ]
+                            await asyncio.gather(*self.serverTasks)
             except websockets.ConnectionClosedError as e:
                 # print(f'>>>>>>>>>>>>>>>>>>>>>>>>> {connectType} connection closed error: {e}')
                 pass
@@ -165,6 +167,7 @@ class Connector:
             with open(filePath, encoding="utf-8") as f:
                 workflow_data = f.read()
             self.uid = msg_json['uid']
+            self.qid = msg_json['qid']
             self.workflow = json.loads(workflow_data)
             # print(f">>>>>>>>>>>>>> loaded workflow --------: {workflow}")
             # print(f">>>>>>>>>>>>>> get server msg inputs: {msg_json['inputs']}")
@@ -203,6 +206,8 @@ class Connector:
                     if len(self.to_server_queue) > 0:
                         data = self.to_server_queue.popleft()
                         data['uid'] = self.uid
+                        data['qid'] = self.qid
+                        data['sid'] = API().userInfo['serverId']
                         # print(">>>>>>>>>>>>>>>>>>>>> c -> s: ", data)
                         await self.serverConn.send(json.dumps(data))
                     elif bt > 10:
