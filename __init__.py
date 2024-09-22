@@ -157,7 +157,6 @@ class klPublisher:
                 "Type": (["Image2Image", "Prompt2Image",], { "default": "Image2Image", }),
                 "Describe": ("STRING", { "multiline": True, "default": "", "placeholder": "" }),
                 "Power": ("INT", { "default": 10, "min": 0, "max": 999999, "step": 1, "display": "number" }),
-                "FreeTimes": ("INT", { "default": 0, "min": 0, "max": 999999, "step": 1, "display": "number" }),
                 "UploadCover": ("BOOLEAN", {"default": False}),
                 "image": (sorted(files), {"image_upload": True}),
             }

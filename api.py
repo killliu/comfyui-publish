@@ -81,7 +81,6 @@ class API:
 
     async def add_workflow(self, data):
         addr = ''
-        target = ''
         cover_uri = ''
         node_data = None
         upload_cover = False
@@ -91,20 +90,20 @@ class API:
             node_type = node.get('type')
             if node_type == "klPublisher":
                 addr = node["widgets_values"][0]
-                cover_uri = node["widgets_values"][8]
-                upload_cover = node["widgets_values"][7]
-                if node["widgets_values"][3] == "Image2Image":
-                    target = 'ai_wf_i2i'
-                elif node["widgets_values"][3] == "Prompt2Image":
-                    target = 'ai_wf_p2i'
+                cover_uri = node["widgets_values"][7]
+                upload_cover = node["widgets_values"][6]
                 node_data = {
-                    'server_id': self.userInfo['serverId'],
-                    'title': node["widgets_values"][1],
                     'id': int(node["widgets_values"][2]),
+                    'sid': self.userInfo['serverId'],
+                    'title': node["widgets_values"][1],
                     'desc': node["widgets_values"][4],
                     'power': int(node["widgets_values"][5]),
-                    'free_times': int(node["widgets_values"][6]),
+                    'is_i2i': node["widgets_values"][3] == "Image2Image",
                 }
+                if node["widgets_values"][3] == "Image2Image" and int(node["widgets_values"][2]) > 100000000:
+                    return WorkflowResultEnum.Failed, "Workflow ID not correct"
+                if node["widgets_values"][3] != "Image2Image" and int(node["widgets_values"][2]) < 100000000:
+                    return WorkflowResultEnum.Failed, "Workflow ID not correct"
             if node_type == "klImage" or node_type == "klText" or node_type == "klText1" or node_type == "klInt" or node_type == "klBool":
                 wv = node.get('widgets_values')
                 value = wv[1]
@@ -132,7 +131,7 @@ class API:
                 form_data.add_field('file', img_path_2_byte_arr(img_path, 256), filename='cover.webp', content_type='image/webp')
             header = {"Authorization": f"Bearer {self.userInfo['token']}"}
             if node_data['id'] > 0:
-                async with session.put(f'{addr}/api/{target}', data=form_data, headers=header) as response:
+                async with session.put(f'{addr}/api/ai_image_wf', data=form_data, headers=header) as response:
                     try:
                         resp = await response.json()
                         if 'failed' in resp:
@@ -146,7 +145,7 @@ class API:
                     except Exception as e:
                         return WorkflowResultEnum.Failed, f'{e}'
             else:
-                async with session.post(f'{addr}/api/{target}', data=form_data, headers=header) as response:
+                async with session.post(f'{addr}/api/ai_image_wf', data=form_data, headers=header) as response:
                     try:
                         resp = await response.json()
                         if 'failed' in resp:

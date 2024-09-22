@@ -59,25 +59,22 @@ class Connector:
                         async with websockets.connect(self.serverUri, max_size=5.5 * 1024 * 1024, extra_headers=self.header) as ws:
                             # print(f'>>>>>>>>>>>>>>>>>>>>>>>>> connect success')
                             self.serverConn = ws
-                            self.to_server_queue.append({ 'key': 'bind', 'wid': self.wid , 'sid': API().userInfo['serverId'] })
+                            self.to_server_queue.append({ 'key': 'bind' })
                             reconnect_delay = RECONNECT_DELAY
                             self.serverTasks = [
                                 asyncio.create_task(self._recevie_server_msgs()),
                                 asyncio.create_task(self._c_t_s_msg())
                             ]
                             await asyncio.gather(*self.serverTasks)
-            except websockets.ConnectionClosedError as e:
+            except (websockets.ConnectionClosedError, websockets.ConnectionClosedOK, websockets.ConnectionClosed, OSError) as e:
                 # print(f'>>>>>>>>>>>>>>>>>>>>>>>>> {connectType} connection closed error: {e}')
-                pass
-            except websockets.ConnectionClosedOK as e:
-                # print(f'>>>>>>>>>>>>>>>>>>>>>>>>> {connectType} connection closed ok error: {e}')
                 pass
             except Exception as e:
                 # print(f'>>>>>>>>>>>>>>>>>>>>>>>>> {connectType} connection error: {e}')
                 pass
             finally: 
                 await asyncio.sleep(reconnect_delay)
-                reconnect_delay = min(reconnect_delay * 2, MAX_RECONNECT_DELAY)
+            reconnect_delay = min(reconnect_delay * 2, MAX_RECONNECT_DELAY)
 
     async def _recevie_comfyui_msgs(self):
         try:
@@ -110,6 +107,10 @@ class Connector:
         except json.JSONDecodeError as e:
             # print(f'>>>>>>>>>>>>>>>>>>>>>>>>> json decode error: {e}')
             pass
+        except websockets.ConnectionClosed as e:
+            if self.serverConn:
+                asyncio.run_coroutine_threadsafe(self.serverConn.close(), asyncio.get_event_loop())
+                threading.Thread(target=self._thread, args=(ConnectType.Server,), daemon=True).start()
         except Exception as e:
             # print(f'>>>>>>>>>>>>>>>>>>>>>>>>> hand receive server message error: {e}')
             pass
@@ -121,7 +122,7 @@ class Connector:
         if not msg_type or msg_type == 'crystools.monitor':
             pass
             return
-        print(f">>>>>>>>>>>>>>>>>> comfyui msg type: {msg_type} >>>>>>>>>>>>>>>>>>")
+        # print(f">>>>>>>>>>>>>>>>>> comfyui msg type: {msg_type} >>>>>>>>>>>>>>>>>>")
         if msg_type == "progress":
             progress = int(msg_json['data']['value'] / msg_json['data']['max'] * 100)
             self.to_server_queue.append({'key': 'progress', 'msg': f'{progress}'})
@@ -198,7 +199,7 @@ class Connector:
 
     async def _c_t_s_msg(self):
         bt = 0
-        span = 0.05
+        span = 0.1
         try:
             while True:
                 bt = bt + span
@@ -206,16 +207,17 @@ class Connector:
                     if len(self.to_server_queue) > 0:
                         data = self.to_server_queue.popleft()
                         data['uid'] = self.uid
+                        data['wid'] = self.wid
                         data['qid'] = self.qid
                         data['sid'] = API().userInfo['serverId']
                         # print(">>>>>>>>>>>>>>>>>>>>> c -> s: ", data)
                         await self.serverConn.send(json.dumps(data))
                     elif bt > 10:
                         bt = 0
-                        # print(">>>>>>>>>>>>>>>>>>>>> c -> s >>>> heartbeat")
                         await self.serverConn.send(json.dumps({'key': 'hb', 'hb': self.free}))
                 await asyncio.sleep(span)
         except Exception as e:
+            print(">>>>>>>>>>>>>> _c_t_s_msg error:", e)
             pass
 
     #region ------------------------------------------ Gen Images ------------------------------------------
