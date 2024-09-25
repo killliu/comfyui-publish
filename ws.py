@@ -171,7 +171,11 @@ class Connector:
             self.qid = msg_json['qid']
             self.workflow = json.loads(workflow_data)
             # print(f">>>>>>>>>>>>>> loaded workflow --------: {workflow}")
-            # print(f">>>>>>>>>>>>>> get server msg inputs: {msg_json['inputs']}")
+            # print(f">>>>>>>>>>>>>> get server mfsg inputs: {msg_json['inputs']}")
+            for key in self.workflow:
+                if self.workflow[key]['class_type'] == "SaveImage":
+                    prefix = self.workflow[key]['inputs']['filename_prefix']
+                    self.workflow[key]['inputs']['filename_prefix'] = f'{prefix}_{self.uid}'
             for item in input_json:
                 id = str(item['id'])
                 if id not in self.workflow:

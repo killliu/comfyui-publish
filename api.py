@@ -89,21 +89,23 @@ class API:
         for node in workflow_nodes:
             node_type = node.get('type')
             if node_type == "klPublisher":
+                id = int(node["widgets_values"][2])
                 addr = node["widgets_values"][0]
                 cover_uri = node["widgets_values"][7]
                 upload_cover = node["widgets_values"][6]
+                isI2I = node["widgets_values"][3] == "Image2Image"
                 node_data = {
-                    'id': int(node["widgets_values"][2]),
+                    'id': id,
                     'sid': self.userInfo['serverId'],
                     'title': node["widgets_values"][1],
                     'desc': node["widgets_values"][4],
                     'power': int(node["widgets_values"][5]),
-                    'is_i2i': node["widgets_values"][3] == "Image2Image",
+                    'is_i2i': isI2I,
                 }
-                if node["widgets_values"][3] == "Image2Image" and int(node["widgets_values"][2]) > 100000000:
-                    return WorkflowResultEnum.Failed, "Workflow ID not correct"
-                if node["widgets_values"][3] != "Image2Image" and int(node["widgets_values"][2]) < 100000000:
-                    return WorkflowResultEnum.Failed, "Workflow ID not correct"
+                if isI2I and id > 0 and id > 100000000:
+                    return WorkflowResultEnum.Failed, "workflow id not correct"
+                if not isI2I and id > 0 and id < 100000000:
+                    return WorkflowResultEnum.Failed, "workflow id not correct"
             if node_type == "klImage" or node_type == "klText" or node_type == "klText1" or node_type == "klInt" or node_type == "klBool":
                 wv = node.get('widgets_values')
                 value = wv[1]
