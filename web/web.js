@@ -197,6 +197,7 @@ app.registerExtension({
         if (nodeData.name === "klImage" ||
             nodeData.name === "klText" ||
             nodeData.name === "klText1" ||
+            nodeData.name === "klSeed" ||
             nodeData.name === "klInt" ||
             nodeData.name === "klSize" ||
             nodeData.name === "klBool") {
@@ -204,6 +205,7 @@ app.registerExtension({
             nodeType.prototype.onNodeCreated = function () {
                 const r = onNodeCreated ? onNodeCreated?.apply(this, arguments) : undefined
                 if (this.bgcolor === undefined || this.bgcolor === "") {
+                    this.color = "#224022"
                     this.bgcolor = "#353"
                 }
                 return r
@@ -213,6 +215,11 @@ app.registerExtension({
             const onNodeCreated = nodeType.prototype.onNodeCreated
             nodeType.prototype.onNodeCreated = function () {
                 const r = onNodeCreated ? onNodeCreated?.apply(this, arguments) : undefined
+                if (this.bgcolor === undefined || this.bgcolor === "") {
+                    this.color = "#402340"
+                    this.bgcolor = "#535"
+                }
+                console.log(">>>>>>>>>>>>>>> publish this:", this)
                 check().then(userInfo => {
                     const auw = this.widgets.find(w => w.name === 'APIUrl')
                     if(auw && auw.value === '' && userInfo !== null && userInfo.APIUrl !== null) {

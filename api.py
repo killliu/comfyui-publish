@@ -106,7 +106,7 @@ class API:
                     return WorkflowResultEnum.Failed, "workflow id not correct"
                 if not isI2I and id > 0 and id < 100000000:
                     return WorkflowResultEnum.Failed, "workflow id not correct"
-            if node_type == "klImage" or node_type == "klText" or node_type == "klText1" or node_type == "klInt" or node_type == "klBool":
+            if node_type == "klImage" or node_type == "klText" or node_type == "klText1" or node_type == "klInt" or node_type == "klSeed" or node_type == "klBool":
                 wv = node.get('widgets_values')
                 value = wv[1]
                 if node_type == "klBool":

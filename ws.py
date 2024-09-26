@@ -182,11 +182,11 @@ class Connector:
                     self.to_server_queue.appendleft({ 'key':'err', 'msg': 'workflow was changed, but not update to server' })
                     return
                 it = item['type']
-                if it == 'klText' or it == "klText1":
+                if it == "klText" or it == "klText1":
                     self.workflow[id]['inputs']['prompt'] = item['value']
-                elif it == 'klInt':
+                elif it == "klInt" or it == "klSeed":
                     self.workflow[id]['inputs']['int_value'] = item['value']
-                elif it == 'klSize':
+                elif it == "klSize":
                     cur_size = str(item['value']).split('|')
                     self.workflow[id]['inputs']['width'] = cur_size[0]
                     self.workflow[id]['inputs']['height'] = cur_size[1]

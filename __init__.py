@@ -110,7 +110,36 @@ class klInt:
     CATEGORY = "killliu"
     def encode(self, describe, int_value):
         return int_value,
-    
+
+class klInt2String:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "int_value": ("INT", { "default": 0, "min": -9223372036854775808, "max": 9223372036854775807, "step": 1 }),
+            }
+        }
+    RETURN_TYPES = ("STRING",)
+    FUNCTION = "encode"
+    CATEGORY = "killliu"
+    def encode(self, int_value):
+        return str(int_value),
+
+class klSeed:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "describe": ("STRING", { "multiline": False, "default": "" }),
+                "int_value": ("INT", { "default": 0, "min": -9223372036854775808, "max": 9223372036854775807, "step": 1 }),
+            }
+        }
+    RETURN_TYPES = ("INT",)
+    FUNCTION = "encode"
+    CATEGORY = "killliu"
+    def encode(self, describe, int_value):
+        return int_value,
+
 class klSize:
     @classmethod
     def INPUT_TYPES(s):
@@ -172,6 +201,8 @@ NODE_CLASS_MAPPINGS = {
     "klText": klText,
     "klText1": klText1,
     "klInt": klInt,
+    "klInt2String": klInt2String,
+    "klSeed": klSeed,
     "klSize": klSize,
     "klBool": klBool,
 }
@@ -179,8 +210,10 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "klPublisher": "publish",
     "klImage": "image loader",
     "klText": "text",
-    "klText1": "text oneline",
+    "klText1": "text 1line",
     "klInt": "int",
+    "klInt2String": "int2string",
+    "klSeed": "seed",
     "klSize": "size",
     "klBool": "boolean",
 }
