@@ -7,6 +7,7 @@ import nodes
 from aiohttp import web
 from .api import API, WorkflowResultEnum
 from .ws import Connector
+from .klLoger import klLoger
 
 def get_node(data):
     try:
@@ -207,7 +208,7 @@ NODE_CLASS_MAPPINGS = {
     "klBool": klBool,
 }
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "klPublisher": "publish",
+    "klPublisher": "publish (http://localhost:9528)",
     "klImage": "image loader",
     "klText": "text",
     "klText1": "text 1line",
@@ -217,5 +218,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "klSize": "size",
     "klBool": "boolean",
 }
+
+klLoger().enable(True, 0)
 
 Connector().Connect()

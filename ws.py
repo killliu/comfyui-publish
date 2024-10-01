@@ -9,6 +9,7 @@ import aiohttp
 import websockets
 import urllib.request
 import urllib.parse
+from .klLoger import klLoger
 
 from enum import Enum
 from .api import API
@@ -55,9 +56,9 @@ class Connector:
                         await asyncio.gather(*self.comfyTasks)
                 elif connectType == ConnectType.Server:
                     if self.comfyConn: 
-                        # print(f'>>>>>>>>>>>>>>>>>>>>>>>>> try to connect server', self.serverUri)
+                        klLoger().log(f'\n>>>>>>>>>>>>>>>>>>>>>>>>> try to connect server {self.serverUri}')
                         async with websockets.connect(self.serverUri, max_size=5.5 * 1024 * 1024, extra_headers=self.header) as ws:
-                            # print(f'>>>>>>>>>>>>>>>>>>>>>>>>> connect success')
+                            klLoger().log(f'\n>>>>>>>>>>>>>>>>>>>>>>>>> connect success')
                             self.serverConn = ws
                             self.to_server_queue.append({ 'key': 'bind' })
                             reconnect_delay = RECONNECT_DELAY
@@ -67,10 +68,10 @@ class Connector:
                             ]
                             await asyncio.gather(*self.serverTasks)
             except (websockets.ConnectionClosedError, websockets.ConnectionClosedOK, websockets.ConnectionClosed, OSError) as e:
-                # print(f'>>>>>>>>>>>>>>>>>>>>>>>>> {connectType} connection closed error: {e}')
+                klLoger().error(f'\n>>>>>>>>>>>>>>>>>>>>>>>>> {connectType} connection closed error: {e}')
                 pass
             except Exception as e:
-                # print(f'>>>>>>>>>>>>>>>>>>>>>>>>> {connectType} connection error: {e}')
+                klLoger().error(f'\n>>>>>>>>>>>>>>>>>>>>>>>>> {connectType} connection error: {e}')
                 pass
             finally: 
                 await asyncio.sleep(reconnect_delay)
@@ -83,10 +84,10 @@ class Connector:
                     if type(message) != bytes:
                         await self._handle_comfyui_msg(json.loads(message))
         except json.JSONDecodeError as e:
-            print(f'>>>>>>>>>>>>>>>>>>>>>>>>> comfyui msg json decode error: {e}')
+            klLoger().error(f'\n>>>>>>>>>>>>>>>>>>>>>>>>> comfyui msg json decode error: {e}')
             pass
         except Exception as e:
-            print(f'>>>>>>>>>>>>>>>>>>>>>>>>> receive comfyui message error: {e}')
+            klLoger().error(f'\n>>>>>>>>>>>>>>>>>>>>>>>>> receive comfyui message error: {e}')
             pass
         finally:
             await asyncio.sleep(0.5)
@@ -105,14 +106,14 @@ class Connector:
                         msg_json = json.loads(message)
                         await self._handle_server_msg(msg_json)
         except json.JSONDecodeError as e:
-            # print(f'>>>>>>>>>>>>>>>>>>>>>>>>> json decode error: {e}')
+            klLoger().error(f'\n>>>>>>>>>>>>>>>>>>>>>>>>> json decode error: {e}')
             pass
         except websockets.ConnectionClosed as e:
             if self.serverConn:
                 asyncio.run_coroutine_threadsafe(self.serverConn.close(), asyncio.get_event_loop())
                 threading.Thread(target=self._thread, args=(ConnectType.Server,), daemon=True).start()
         except Exception as e:
-            # print(f'>>>>>>>>>>>>>>>>>>>>>>>>> hand receive server message error: {e}')
+            klLoger().error(f'\n>>>>>>>>>>>>>>>>>>>>>>>>> hand receive server message error: {e}')
             pass
         finally:
             await asyncio.sleep(0.5)
@@ -122,7 +123,7 @@ class Connector:
         if not msg_type or msg_type == 'crystools.monitor':
             pass
             return
-        # print(f">>>>>>>>>>>>>>>>>> comfyui msg type: {msg_type} >>>>>>>>>>>>>>>>>>")
+        # klLoger().log(f"\n>>>>>>>>>>>>>>>>>> comfyui msg type: {msg_type} >>>>>>>>>>>>>>>>>>")
         if msg_type == "progress":
             progress = int(msg_json['data']['value'] / msg_json['data']['max'] * 100)
             self.to_server_queue.append({'key': 'progress', 'msg': f'{progress}'})
@@ -140,7 +141,7 @@ class Connector:
             self.to_server_queue.append({'key': 'interrupted'})
             pass
         else:
-            # print(f">>>>>>>>>>>>>>>>>> comfyui msg type: {msg_type} >>>>>>>>>>>>>>>>>>")
+            klLoger().log(f"\n>>>>>>>>>>>>>>>>>> comfyui msg type: {msg_type} >>>>>>>>>>>>>>>>>>")
             pass
 
     async def _handle_server_msg(self, msg_json):
@@ -156,9 +157,9 @@ class Connector:
                     image_data = base64.b64decode(value)
                     with open(os.path.join(get_root_uri(), 'input', f"{names[i]}.webp"), "wb") as f:
                         f.write(image_data)
-                    # print(">>>>>>>>>>>>>>>>>>>>>>>>>>> write file success:", f"{names[i]}.webp")
+                    klLoger().log(f"\n>>>>>>>>>>>>>>>>>>>>>>>>>>> write file success: {names[i]}.webp")
                 except Exception as e:
-                    # print(f">>>>>>>>>>>>>>>>>>>>>>>>>>> Error writing file: {e}")
+                    klLoger().error(f"\n>>>>>>>>>>>>>>>>>>>>>>>>>>> Error writing file: {e}")
                     continue
         filePath = os.path.join(get_root_uri(), 'custom_nodes', 'comfyui-publish', 'workflows', f'{str(self.wid)}.json')
         if os.path.exists(filePath) == False:
@@ -170,8 +171,8 @@ class Connector:
             self.uid = msg_json['uid']
             self.qid = msg_json['qid']
             self.workflow = json.loads(workflow_data)
-            # print(f">>>>>>>>>>>>>> loaded workflow --------: {workflow}")
-            # print(f">>>>>>>>>>>>>> get server mfsg inputs: {msg_json['inputs']}")
+            klLoger().log(f"\n>>>>>>>>>>>>>> loaded workflow: {self.workflow}")
+            klLoger().log(f"\n>>>>>>>>>>>>>> get server mfsg inputs: {msg_json['inputs']}")
             for key in self.workflow:
                 if self.workflow[key]['class_type'] == "SaveImage":
                     prefix = self.workflow[key]['inputs']['filename_prefix']
@@ -194,11 +195,11 @@ class Connector:
                     self.workflow[id]['inputs']['bool_value'] = item['value']
                 elif it == "klImage":
                     self.workflow[id]['inputs']['image'] = item['value']
-            # print(">>>>>>>>>>>>>>>>>>>>>>>>> workflow:\n", self.workflow)
+            klLoger().log(f"\n>>>>>>>>>>>>>>>>>>>>>>>>> workflow:{self.workflow}\n")
             await self.GenImages(self.workflow)
             pass
         except Exception as e:
-            # print(f'>>>>>>>>>>>>>>>>>>>>>>>>> execute prompt error: {e}')
+            klLoger().error(f'\n>>>>>>>>>>>>>>>>>>>>>>>>> execute prompt error: {e}')
             pass
 
     async def _c_t_s_msg(self):
@@ -214,14 +215,14 @@ class Connector:
                         data['wid'] = self.wid
                         data['qid'] = self.qid
                         data['sid'] = API().userInfo['serverId']
-                        # print(">>>>>>>>>>>>>>>>>>>>> c -> s: ", data)
+                        klLoger().log(f"\n>>>>>>>>>>>>>>>>>>>>> c -> s: {data}")
                         await self.serverConn.send(json.dumps(data))
                     elif bt > 10:
                         bt = 0
                         await self.serverConn.send(json.dumps({'key': 'hb', 'hb': self.free}))
                 await asyncio.sleep(span)
         except Exception as e:
-            print(">>>>>>>>>>>>>> _c_t_s_msg error:", e)
+            klLoger().error(f"\n>>>>>>>>>>>>>> _c_t_s_msg error: {e}")
             pass
 
     #region ------------------------------------------ Gen Images ------------------------------------------
@@ -237,14 +238,14 @@ class Connector:
                         return result
                     else:
                         self.to_server_queue.appendleft({ 'key':'err', 'msg': e })
-                        # print(f">>>>>>>>>>>>>>>>>> Failed to send prompt, status code: {resp.status}")
+                        klLoger().log(f"\n>>>>>>>>>>>>>>>>>> Failed to send prompt, status code: {resp.status}")
                         pass
         except aiohttp.ClientConnectionError as e:
             self.to_server_queue.appendleft({ 'key':'err', 'msg': e })
-            # print(f">>>>>>>>>>>>>>>>> _queue_prompt failed: {e}")
+            klLoger().error(f"\n>>>>>>>>>>>>>>>>> _queue_prompt failed: {e}")
         except Exception as e:
             self.to_server_queue.appendleft({ 'key':'err', 'msg': e })
-            # print(f">>>>>>>>>>>> queue prompt error: {e}")
+            klLoger().error(f"\n>>>>>>>>>>>> queue prompt error: {e}")
         return None
 
     def _get_history(self, prompt_id):
@@ -262,7 +263,7 @@ class Connector:
             return
         self.prompt_id = pd['prompt_id']
 
-        self.to_server_queue.append({ 'key':'success', 'msg': '' })
+        # self.to_server_queue.append({ 'key':'success', 'msg': '' })
 
         while self.free == False:
             await asyncio.sleep(0.3)
@@ -276,14 +277,12 @@ class Connector:
             if 'images' in node_output:
                 for image in node_output['images']:
                     sp = os.path.join(get_root_uri(), 'output', image['subfolder'], image['filename'])
-                    # print(">>>>>>>>>>>>>>>>>>>> save image path:", sp)
-                    bs, err = img_path_2_base64(sp)
-                    if err != "":
-                        self.to_server_queue.appendleft({'key': 'err', 'msg': err})
-                        pass
-                    else:
+                    klLoger().log(f"\n>>>>>>>>>>>>>>>>>>>> save image path: {sp}")
+                    bs = img_path_2_base64(sp)
+                    if bs != None:
                         image_base64s.append(bs)
                         names.append(image['filename'].split('.')[-2])
+        klLoger().log(f"\n\n>>>>>>>>>>>>>>>>>>>>> image count: {len(names)}\n\n")
         self.to_server_queue.append({'key': 'images', 'images': image_base64s, 'names': names})
 
     #endregion

@@ -86,6 +86,7 @@ class API:
         upload_cover = False
         workflow_nodes = data['data']['workflow']['nodes']
         klInputs = []
+        fixedPower = True
         for node in workflow_nodes:
             node_type = node.get('type')
             if node_type == "klPublisher":
@@ -115,9 +116,11 @@ class API:
                     value = str(wv[1])
                 klInputs.append({ 'id':node.get('id'), 'type':node.get('type'), 'desc': wv[0], 'value': value })
             if node_type == "klSize":
+                fixedPower = False
                 wv = node.get('widgets_values')
                 value = f'{wv[0]}|{wv[1]}'
                 klInputs.append({ 'id':node.get('id'), 'type':node.get('type'), 'desc': '', 'value': value })
+        node_data['fp'] = 1 if fixedPower else 0
         if len(klInputs) > 0:
             inputs = sorted(klInputs, key=lambda item: item['id'])
             node_data['inputs'] = json.dumps(inputs)

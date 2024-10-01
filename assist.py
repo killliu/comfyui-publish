@@ -1,4 +1,3 @@
-import hashlib
 import io
 import json
 import os
@@ -152,13 +151,13 @@ def img_path_2_byte_arr(img_path:str, max_side:int):
     except Exception as e:
         raise SystemError(f'{img_path} handle error:{e}')
 
-def img_path_2_base64(img_path: str) -> tuple[io.BytesIO, str]:
+def img_path_2_base64(img_path: str) -> io.BytesIO:
     try:
         with Image.open(img_path) as img:
             img_byte_arr = io.BytesIO()
             img.save(img_byte_arr, format='webp')
             img_byte_arr.seek(0)
             img_base64 = base64.b64encode(img_byte_arr.getvalue()).decode('utf-8')
-            return img_base64, ""
-    except (OSError, IOError) as e:
-        return None, f'Error handling image at {img_path}: {e}'
+            return img_base64
+    except (OSError, IOError) as _:
+        return None
