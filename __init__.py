@@ -5,9 +5,11 @@ import folder_paths
 import nodes
 
 from aiohttp import web
+from .assist import is_chinese
 from .api import API, WorkflowResultEnum
 from .ws import Connector
 from .klLoger import klLoger
+from translate import Translator
 
 def get_node(data):
     try:
@@ -56,14 +58,15 @@ class klImage(nodes.LoadImage):
         files = [f for f in os.listdir(input_dir) if os.path.isfile(os.path.join(input_dir, f))]
         return {
             "required": {
-                "describe": ("STRING", { "multiline": False, "default": "" }),
+                "title": ("STRING", { "multiline": False, "default": "" }),
+                "describe": ("STRING", { "multiline": True, "default": "" }),
                 "image": (sorted(files), {"image_upload": True}),
             }
         }
     RETURN_TYPES = ("IMAGE",)
     FUNCTION = "load_capture"
     CATEGORY = "killliu"
-    def load_capture(self, describe, image):
+    def load_capture(self, title, describe, image):
         return super().load_image(folder_paths.get_annotated_filepath(image))
 
 class klText:
@@ -71,22 +74,28 @@ class klText:
     def INPUT_TYPES(s):
         return {
             "required": {
-                "describe": ("STRING", { "multiline": False, "default": "" }),
+                "title": ("STRING", { "multiline": False, "default": "" }),
+                "describe": ("STRING", { "multiline": True, "default": "" }),
                 "prompt": ("STRING", {"multiline": True, "default": "" }), 
             }
         }
     RETURN_TYPES = ("STRING",)
     FUNCTION = "encode"
     CATEGORY = "killliu"
-    def encode(self, describe, prompt):
+    def encode(self, title, describe, prompt):
+        if is_chinese(prompt):
+            text = Translator(to_lang="en", from_lang="zh").translate(prompt)
+            klLoger().log(f">>>>>>>>>>>>>>>>>>>>>>>>>>>> {describe} translated: {text}")
+            return text,
         return prompt,
-    
+
 class klText1:
     @classmethod
     def INPUT_TYPES(s):
         return {
             "required": {
-                "describe": ("STRING", { "multiline": False, "default": "" }),
+                "title": ("STRING", { "multiline": False, "default": "" }),
+                "describe": ("STRING", { "multiline": True, "default": "" }),
                 "prompt": ("STRING", {"multiline": False, "default": "" }), 
             }
         }
@@ -94,7 +103,11 @@ class klText1:
     FUNCTION = "encode"
     CATEGORY = "killliu"
     DESCRIPTION = ("Text with one line")
-    def encode(self, describe, prompt):
+    def encode(self, title, describe, prompt):
+        if is_chinese(prompt):
+            text = Translator(to_lang="en", from_lang="zh").translate(prompt)
+            klLoger().log(f">>>>>>>>>>>>>>>>>>>>>>>>>>>> {describe} translated: {text}")
+            return text,
         return prompt,
 
 class klInt:
@@ -102,15 +115,57 @@ class klInt:
     def INPUT_TYPES(s):
         return {
             "required": {
-                "describe": ("STRING", { "multiline": False, "default": "" }),
+                "title": ("STRING", { "multiline": False, "default": "" }),
+                "describe": ("STRING", { "multiline": True, "default": "" }),
                 "int_value": ("INT", { "default": 0, "min": -9223372036854775808, "max": 9223372036854775807, "step": 1 }),
             }
         }
     RETURN_TYPES = ("INT",)
     FUNCTION = "encode"
     CATEGORY = "killliu"
-    def encode(self, describe, int_value):
+    def encode(self, title, describe, int_value):
         return int_value,
+
+class klSimpleMath:
+    def __init__(self):
+        pass
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "a": ("INT", {"default": 0, "min": -0xffffffffffffffff, "max": 0xffffffffffffffff, "step": 1}),
+                "b": ("INT", {"default": 0, "min": -0xffffffffffffffff, "max": 0xffffffffffffffff, "step": 1}),
+                "operation": (["add", "subtract", "multiply", "divide_float", "divide", "modulo", "power"],),
+            },
+        }
+    RETURN_TYPES = ("INT", "FLOAT",)
+    FUNCTION = "math_operation"
+    CATEGORY = "killliu"
+    def math_operation(self, a, b, operation):
+        if operation == "add":
+            result = a + b
+            return result, float(result)
+        elif operation == "subtract":
+            result = a - b
+            return result, float(result)
+        elif operation == "multiply":
+            result = a * b
+            return result, float(result)
+        elif operation == "divide_float":
+            if b == 0:
+                return 0, float('inf') 
+            return int(float(a) / float(b)), float(a) / float(b)
+        elif operation == "divide":
+            if b == 0:
+                return 0,
+            return a // b, float(a) / float(b)
+        elif operation == "modulo":
+            if b == 0:
+                return 0, float('inf')
+            return a % b, float(a) / float(b)
+        elif operation == "power":
+            result = a ** b
+            return result, float(result)
 
 class klInt2String:
     @classmethod
@@ -131,14 +186,15 @@ class klSeed:
     def INPUT_TYPES(s):
         return {
             "required": {
-                "describe": ("STRING", { "multiline": False, "default": "" }),
+                "title": ("STRING", { "multiline": False, "default": "" }),
+                "describe": ("STRING", { "multiline": True, "default": "" }),
                 "int_value": ("INT", { "default": 0, "min": -9223372036854775808, "max": 9223372036854775807, "step": 1 }),
             }
         }
     RETURN_TYPES = ("INT",)
     FUNCTION = "encode"
     CATEGORY = "killliu"
-    def encode(self, describe, int_value):
+    def encode(self, title, describe, int_value):
         return int_value,
 
 class klSize:
@@ -157,19 +213,53 @@ class klSize:
     def encode(self, width, height):
         return width, height,
 
+class klSizeAdapter:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "width": ("INT", { "default": 768, "min": 256, "max": 2048, "step": 64 }),
+                "height": ("INT", { "default": 1024, "min": 256, "max": 2048, "step": 64 }),
+                "invert": ("BOOLEAN", {"default": False}),
+                "max_side": ("INT", { "default": 1024, "min": 256, "max": 2048, "step": 64 }),
+            }
+        }
+    RETURN_TYPES = ("INT","INT","INT","INT","STRING",)
+    RETURN_NAMES = ("width","height","adapter width", "adapter height", "adapter size")
+    FUNCTION = "encode"
+    CATEGORY = "killliu"
+    def encode(self, width, height, invert, max_side):
+        if invert == True:
+            width, height = height, width
+        aspect_ratio = width / height
+        if width < height:
+            if height > max_side:
+                adp_height = max_side
+                adp_width = int(max_side * aspect_ratio)
+            else:
+                return width, height, width, height, f"w:{str(width)},h:{str(height)}"
+        else:
+            if width > max_side:
+                adp_width = max_side
+                adp_height = int(max_side / aspect_ratio)
+            else:
+                return width, height, width, height, f"w:{str(width)},h:{str(height)}"
+        return width, height, adp_width, adp_height, f"w:{str(adp_width)},h:{str(adp_height)}"
+
 class klBool:
     @classmethod
     def INPUT_TYPES(s):
         return {
             "required": {
-                "describe": ("STRING", { "multiline": False, "default": "" }),
+                "title": ("STRING", { "multiline": False, "default": "" }),
+                "describe": ("STRING", { "multiline": True, "default": "" }),
                 "bool_value": ("BOOLEAN", {"default": False}),
             }
         }
     RETURN_TYPES = ("BOOLEAN",)
     FUNCTION = "encode"
     CATEGORY = "killliu"
-    def encode(self, describe, bool_value):
+    def encode(self, title, describe, bool_value):
         return bool_value,
 
 class klPublisher:
@@ -202,9 +292,11 @@ NODE_CLASS_MAPPINGS = {
     "klText": klText,
     "klText1": klText1,
     "klInt": klInt,
+    "klSimpleMath": klSimpleMath,
     "klInt2String": klInt2String,
     "klSeed": klSeed,
     "klSize": klSize,
+    "klSizeAdapter": klSizeAdapter,
     "klBool": klBool,
 }
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -213,9 +305,11 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "klText": "text",
     "klText1": "text 1line",
     "klInt": "int",
+    "klSimpleMath": "simple math",
     "klInt2String": "int2string",
     "klSeed": "seed",
     "klSize": "size",
+    "klSizeAdapter": "size adapter",
     "klBool": "boolean",
 }
 

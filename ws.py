@@ -192,7 +192,7 @@ class Connector:
                     self.workflow[id]['inputs']['width'] = cur_size[0]
                     self.workflow[id]['inputs']['height'] = cur_size[1]
                 elif it == "klBool":
-                    self.workflow[id]['inputs']['bool_value'] = item['value']
+                    self.workflow[id]['inputs']['bool_value'] = item['value'] == "1" or item['value'] == "true"
                 elif it == "klImage":
                     self.workflow[id]['inputs']['image'] = item['value']
             klLoger().log(f"\n>>>>>>>>>>>>>>>>>>>>>>>>> workflow:{self.workflow}\n")

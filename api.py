@@ -4,6 +4,7 @@ import aiohttp
 
 from enum import Enum
 from .assist import encrypt, get_mechine_info, get_root_uri, img_path_2_byte_arr, json_to_file
+from .klLoger import klLoger
 
 class WorkflowResultEnum(Enum):
     Failed = 1
@@ -63,6 +64,8 @@ class API:
             async with aiohttp.ClientSession() as session:
                 async with session.post(f"{addr}/api/comfy_server", data={"server": json.dumps(get_mechine_info())}, headers=headers) as response:
                     server_result = await response.json()
+            
+            klLoger().error(f"\n\n>>>>>>>>>>>>>>>>> server_result: {server_result}\n\n")
             if 'failed' in server_result:
                 return server_result['failed']
             self.userInfo = {
@@ -109,17 +112,17 @@ class API:
                     return WorkflowResultEnum.Failed, "workflow id not correct"
             if node_type == "klImage" or node_type == "klText" or node_type == "klText1" or node_type == "klInt" or node_type == "klSeed" or node_type == "klBool":
                 wv = node.get('widgets_values')
-                value = wv[1]
+                value = wv[2]
                 if node_type == "klBool":
-                    value = "0" if wv[1] == False else "1"
+                    value = "0" if wv[2] == False else "1"
                 elif node_type == "klInt":
-                    value = str(wv[1])
-                klInputs.append({ 'id':node.get('id'), 'type':node.get('type'), 'desc': wv[0], 'value': value })
+                    value = str(wv[2])
+                klInputs.append({ 'id':node.get('id'), 'type':node.get('type'), 'title': wv[0], 'desc': wv[1], 'value': value })
             if node_type == "klSize":
                 fixedPower = False
                 wv = node.get('widgets_values')
                 value = f'{wv[0]}|{wv[1]}'
-                klInputs.append({ 'id':node.get('id'), 'type':node.get('type'), 'desc': '', 'value': value })
+                klInputs.append({ 'id':node.get('id'), 'type':node.get('type'), 'title': '', 'desc': '', 'value': value })
         node_data['fp'] = 1 if fixedPower else 0
         if len(klInputs) > 0:
             inputs = sorted(klInputs, key=lambda item: item['id'])

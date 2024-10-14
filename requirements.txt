@@ -3,3 +3,4 @@ aiohttp
 base58
 cryptography
 gputil
+translate

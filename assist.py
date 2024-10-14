@@ -161,3 +161,9 @@ def img_path_2_base64(img_path: str) -> io.BytesIO:
             return img_base64
     except (OSError, IOError) as _:
         return None
+
+def is_chinese(text):
+    for char in text:
+            if '\u4e00' <= char <= '\u9fff':
+                return True
+    return False
